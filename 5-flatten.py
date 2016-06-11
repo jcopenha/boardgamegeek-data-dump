@@ -24,12 +24,11 @@ def flatten_simple(key, values):
   else:
     value = values[key]
   
-  return key, value
+  return {key : value}
 
 def flatten_dict(key, values):
   value = None
   new_key = None
-  headers = Set([])
   flattened = {}
   # flatten language_depenence everything should be 1-5
   diff = 0
@@ -44,11 +43,10 @@ def flatten_dict(key, values):
       value = try_parse_int(values[key][x][1], val = 0)
     else:
       value = values[key][y]
-    
-    headers.add(new_key)
+
     flattened[new_key] = value
 
-  return headers, flattened
+  return flattened
 
 def parse_json_file(filename):
   headers = Set([])
@@ -59,14 +57,14 @@ def parse_json_file(filename):
     j = json.loads(l)
     current = {}
     for k in j.keys():
+      d = {}
       if type(j[k]) is dict:
-        h, d = flatten_dict(k,j)
-        headers = headers.union(h)
-        current.update(d)
+        d = flatten_dict(k,j)
       else:
-        h, v = flatten_simple(k,j)
-        headers.add(h)
-        current[h] = v
+        d = flatten_simple(k,j)
+
+      headers = headers.union(Set(d.keys()))
+      current.update(d)
   
     l = f.readline()
     rows.append(current)
