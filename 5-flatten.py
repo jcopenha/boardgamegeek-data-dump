@@ -26,6 +26,30 @@ def flatten_simple(key, values):
   
   return key, value
 
+def flatten_dict(key, values):
+  value = None
+  new_key = None
+  headers = Set([])
+  flattened = {}
+  # flatten language_depenence everything should be 1-5
+  diff = 0
+  if key == "language_dependence" and len(values[key].keys()) > 0:
+    diff = min([int(n) for n in values[key].keys()])-1
+  for x in values[key].keys():
+    y = x
+    if key == "language_dependence":
+      x = str(int(x) - diff)
+    new_key = key + "_" + x
+    if new_key in ["ranks_boardgame","ranks_strategygames","ranks_thematic","ranks_familygames","rank_cgs","ranks_abstracts"]:
+      value = try_parse_int(values[key][x][1], val = 0)
+    else:
+      value = values[key][y]
+    
+    headers.add(new_key)
+    flattened[new_key] = value
+
+  return headers, flattened
+
 def parse_json_file(filename):
   headers = Set([])
   rows = []
@@ -36,22 +60,9 @@ def parse_json_file(filename):
     current = {}
     for k in j.keys():
       if type(j[k]) is dict:
-        # flatten language_depenence everything should be 1-5
-        diff = 0
-        if k == "language_dependence" and len(j[k].keys()) > 0:
-          diff = min([int(n) for n in j[k].keys()])-1
-        for x in j[k].keys():
-          y = x
-          if k == "language_dependence":
-            x = str(int(x) - diff)
-          s = k + "_" + x
-          if s in ["ranks_boardgame","ranks_strategygames","ranks_thematic","ranks_familygames","rank_cgs","ranks_abstracts"]:
-            headers.add(s)
-            current[s] = try_parse_int(j[k][x][1], val = 0)
-          else:
-            headers.add(s)
-            current[s] = j[k][y]
-  #        print s
+        h, d = flatten_dict(k,j)
+        headers = headers.union(h)
+        current.update(d)
       else:
         h, v = flatten_simple(k,j)
         headers.add(h)
