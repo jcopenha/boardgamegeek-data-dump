@@ -10,9 +10,14 @@ def try_parse_int(s, base=10, val=None):
   except ValueError:
     return val
 
+
+headers_to_remove = ["comments","py/object","description","podcastepisode"]
+
+#TODO do some args handling..
 path_to_json = 'BoardGameGeek.json/201508/boardgame_batches'
-print os.listdir(os.path.join(os.curdir,path_to_json))
+#print os.listdir(os.path.join(os.curdir,path_to_json))
 json_files = [pos_json for pos_json in os.listdir(os.path.join(os.curdir,path_to_json)) if pos_json.endswith('.json')]
+print ">> Found", len(json_files), "JSON files to parse"
 
 
 
@@ -21,8 +26,10 @@ json_files = [pos_json for pos_json in os.listdir(os.path.join(os.curdir,path_to
 
 headers = Set([])
 rows = []
+current_file_count = 0
 for filename in json_files:
-  print filename
+  if current_file_count % 100 == 0:
+     print "+ Processed",current_file_count, "of", len(json_files)
   # build headers
   f = open(os.path.join(os.curdir,path_to_json,filename))
   l = f.readline()
@@ -66,24 +73,32 @@ for filename in json_files:
   
     l = f.readline()
     rows.append(current)
+  current_file_count += 1
 #    print "finished", current["objectid"]
+print ">> All files processed"
 
-headers.remove("comments")
-headers.remove("py/object")
-headers.remove("description")
-headers.remove("podcastepisode")
-headerList = list(headers)
-headerList.sort()
-print headerList
+for h in headers_to_remove:
+  headers.remove(h)
+
+header_list = list(headers)
+header_list.sort()
+print ">> Generating CSV with following headers:"
+for h in header_list:
+  print ">> - ", h
 #print rows
 #for k in rows[0].keys():
 #  print k, rows[0][k]
 
+print ">> Found", len(rows), "boardgames"
+current_boardgame_count = 0
 with open('bgg.csv', 'w') as csvfile:
-   writer = csv.DictWriter(csvfile, fieldnames=headerList, extrasaction='ignore')
+   writer = csv.DictWriter(csvfile, fieldnames=header_list, extrasaction='ignore')
    writer.writeheader()
    for r in rows:
      writer.writerow(r)
+     current_boardgame_count += 1
+     if current_boardgame_count % 1000 == 0:
+      print "+ Written", current_boardgame_count, "boardgames"
 
 # comments data is limited to 100 so skip that
 #print len(j["comments"])
