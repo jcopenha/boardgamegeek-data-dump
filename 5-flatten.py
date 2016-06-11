@@ -11,6 +11,21 @@ def try_parse_int(s, base=10, val=None):
   except ValueError:
     return val
 
+def flatten_simple(key, values):
+  value = None
+  if key in ["publisher","designer","family","category","artist","version","subdomain"] and type(values[key]) is list:
+    # pick the first name
+    if len(values[key]) > 0 :
+      value = values[key][0][0]
+  elif key in ["name"] and len(values[key]) > 0:
+    value = values[key][0]
+  elif key in ["honor","mechanic"]:
+    value = len(values[key])
+  else:
+    value = values[key]
+  
+  return key, value
+
 def parse_json_file(filename):
   headers = Set([])
   rows = []
@@ -38,76 +53,64 @@ def parse_json_file(filename):
             current[s] = j[k][y]
   #        print s
       else:
-        if k in ["publisher","designer","family","category","artist","version","subdomain"] and type(j[k]) is list:
-          # pick the first name
-          headers.add(k)
-          if len(j[k]) > 0 :
-            current[k] = j[k][0][0]
-        elif k in ["name"] and len(j[k]) > 0:
-          headers.add(k)
-          current[k] = j[k][0]
-        elif k in ["honor","mechanic"]:
-          headers.add(k)
-          current[k] = len(j[k])
-        else:
-          headers.add(k)
-          current[k] = j[k]
-  #      print k
+        h, v = flatten_simple(k,j)
+        headers.add(h)
+        current[h] = v
   
     l = f.readline()
     rows.append(current)
   return headers, rows
 
-parser = argparse.ArgumentParser(description='Flatten BoardGameGeek JSON files.')
-parser.add_argument('--verbose', dest='verbose', action='store_true',
-                    default=False, help='Verbose output')
+def main():
+  #TODO: add argparse for path_to_json?
+  parser = argparse.ArgumentParser(description='Flatten BoardGameGeek JSON files.')
+  parser.add_argument('--verbose', dest='verbose', action='store_true',
+                      default=False, help='Verbose output')
+  args = parser.parse_args()
 
-args = parser.parse_args()
+  headers_to_remove = ["comments","py/object","description","podcastepisode"]
 
-headers_to_remove = ["comments","py/object","description","podcastepisode"]
+  path_to_json = 'BoardGameGeek.json/201508/boardgame_batches'
+  json_files = [pos_json for pos_json in os.listdir(os.path.join(os.curdir,path_to_json)) if pos_json.endswith('.json')]
+  print ">> Found", len(json_files), "JSON files to parse"
 
-#TODO do some args handling..
-path_to_json = 'BoardGameGeek.json/201508/boardgame_batches'
-#print os.listdir(os.path.join(os.curdir,path_to_json))
-json_files = [pos_json for pos_json in os.listdir(os.path.join(os.curdir,path_to_json)) if pos_json.endswith('.json')]
-print ">> Found", len(json_files), "JSON files to parse"
+  # TODO: fix image links
+  # TODO: num_players junk
 
+  current_file_count = 0
+  headers = Set([])
+  rows = []
+  for filename in json_files:
+    if args.verbose and current_file_count % 100 == 0:
+      print "+ Processed", current_file_count, "of", len(json_files)
+    h, r = parse_json_file(os.path.join(os.curdir, path_to_json, filename))
+    headers = headers.union(h)
+    rows = rows + r
+    current_file_count += 1
+  print ">> All files processed"
 
+  for h in headers_to_remove:
+    headers.remove(h)
 
-# TODO: fix image links
-# TODO: num_players junk
+  header_list = list(headers)
+  header_list.sort()
+  if args.verbose:
+    print ">> Generating CSV with following headers:"
+    for h in header_list:
+      print "+", h
 
-current_file_count = 0
-headers = Set([])
-rows = []
-for filename in json_files:
-  if current_file_count % 100 == 0 and args.verbose:
-     print "+ Processed", current_file_count, "of", len(json_files)
-  h, r = parse_json_file(os.path.join(os.curdir, path_to_json, filename))
-  headers = headers.union(h)
-  rows = rows + r
-  current_file_count += 1
-print ">> All files processed"
+  print ">> Found", len(rows), "boardgames"
+  current_boardgame_count = 0
+  with open('bgg.csv', 'w') as csvfile:
+    writer = csv.DictWriter(csvfile, fieldnames=header_list, extrasaction='ignore')
+    writer.writeheader()
+    for r in rows:
+      writer.writerow(r)
+      current_boardgame_count += 1
+      if args.verbose and current_boardgame_count % 1000 == 0:
+        print "+ Written", current_boardgame_count, "boardgames"
 
-for h in headers_to_remove:
-  headers.remove(h)
+  print ">> Fisnished writing bgg.csv"
 
-header_list = list(headers)
-header_list.sort()
-if args.verbose:
-  print ">> Generating CSV with following headers:"
-  for h in header_list:
-    print "+", h
-
-print ">> Found", len(rows), "boardgames"
-current_boardgame_count = 0
-with open('bgg.csv', 'w') as csvfile:
-  writer = csv.DictWriter(csvfile, fieldnames=header_list, extrasaction='ignore')
-  writer.writeheader()
-  for r in rows:
-    writer.writerow(r)
-    current_boardgame_count += 1
-    if current_boardgame_count % 1000 == 0 and args.verbose:
-      print "+ Written", current_boardgame_count, "boardgames"
-
-print ">> Fisnished writing bgg.csv"
+if __name__ == "__main__":
+    main()
